@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+aiohttp
+sympy
+chromadb
+pydantic
+python-dotenv
