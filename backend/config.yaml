@@ -1,0 +1,5 @@
+tier: C # Forced to C because user specified no local LLM
+cloud_provider: omniroute
+cloud_api_key: "" # Read from env var
+cloud_base_url: "https://api.omniroute.dev/v1" # Or whatever omniroute URL is
+embedding_backend: omniroute

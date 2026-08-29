@@ -1,62 +1,80 @@
--- topics: static-ish, seeded from roadmap.json
+-- topics
 CREATE TABLE IF NOT EXISTS topics (
-  id TEXT PRIMARY KEY,          -- e.g. "percentages"
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  category TEXT NOT NULL,       -- Foundation / Intermediate / Advanced / Logical / ...
-  prerequisites TEXT,           -- JSON array of topic ids
-  order_index INTEGER
+  category TEXT NOT NULL
 );
 
--- progress: one row per topic
+-- progress
 CREATE TABLE IF NOT EXISTS progress (
   topic_id TEXT PRIMARY KEY REFERENCES topics(id),
-  status TEXT NOT NULL DEFAULT 'locked',  -- locked / current / mastered
-  mastery_score REAL DEFAULT 0,           -- 0.0–1.0, rolling accuracy
-  attempts INTEGER DEFAULT 0,
-  correct INTEGER DEFAULT 0,
-  last_practiced_at TIMESTAMP
+  mastery_score REAL DEFAULT 0.0,
+  status TEXT DEFAULT 'locked'
 );
 
--- questions: both curated and generated end up here
+-- reasoning_ratings: per-topic and overall Elo-style rating
+CREATE TABLE IF NOT EXISTS reasoning_ratings (
+  topic_id TEXT,                  -- NULL row = overall rating
+  rating INTEGER NOT NULL DEFAULT 1000,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (topic_id)
+);
+
+-- book_sources: which book/chapter a question or explanation was grounded in
+CREATE TABLE IF NOT EXISTS book_sources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book TEXT NOT NULL,             -- 'aptitude_math' | 'puzzles'
+  chapter TEXT,
+  page_number INTEGER,
+  topic_id TEXT REFERENCES topics(id)
+);
+
+-- questions table
 CREATE TABLE IF NOT EXISTS questions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  topic_id TEXT REFERENCES topics(id),
-  source TEXT NOT NULL,          -- curated / generated / hybrid
-  difficulty INTEGER NOT NULL,   -- 0–10 per the difficulty scale
+  topic_id TEXT NOT NULL REFERENCES topics(id),
+  difficulty INTEGER NOT NULL,
   question_text TEXT NOT NULL,
-  options TEXT,                  -- JSON array, null if not MCQ
+  options TEXT NOT NULL, -- JSON array
   correct_answer TEXT NOT NULL,
-  explanation TEXT,
-  validated INTEGER DEFAULT 0,   -- 0/1
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  explanation TEXT NOT NULL,
+  book_source_id INTEGER REFERENCES book_sources(id)
 );
 
--- attempts: every time you answer something
+-- lesson_sessions: for LangGraph checkpoint cross-reference / daily summary
+CREATE TABLE IF NOT EXISTS lesson_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  completed INTEGER DEFAULT 0,
+  rating_delta INTEGER DEFAULT 0,
+  started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ended_at TIMESTAMP
+);
+
+-- attempts table
 CREATE TABLE IF NOT EXISTS attempts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  question_id INTEGER REFERENCES questions(id),
-  topic_id TEXT REFERENCES topics(id),
-  was_correct INTEGER NOT NULL,
-  time_taken_seconds INTEGER,
-  answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  question_id INTEGER NOT NULL REFERENCES questions(id),
+  is_correct BOOLEAN NOT NULL,
+  time_taken_ms INTEGER NOT NULL,
+  used_hint BOOLEAN NOT NULL DEFAULT 0,
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- mistakes: for the Review page, and revision scheduling
+-- mistakes table
 CREATE TABLE IF NOT EXISTS mistakes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  question_id INTEGER REFERENCES questions(id),
-  topic_id TEXT REFERENCES topics(id),
-  mistake_count INTEGER DEFAULT 1,
-  next_review_at TIMESTAMP,
-  interval_days INTEGER DEFAULT 1,   -- grows via spaced repetition
-  last_reviewed_at TIMESTAMP
+  question_id INTEGER NOT NULL REFERENCES questions(id),
+  user_answer TEXT NOT NULL,
+  mistake_category TEXT,
+  resolved BOOLEAN DEFAULT 0,
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- daily_log: streak + daily mission tracking
+-- daily_log
 CREATE TABLE IF NOT EXISTS daily_log (
-  date TEXT PRIMARY KEY,          -- 'YYYY-MM-DD'
-  learn_done INTEGER DEFAULT 0,
-  practice_done INTEGER DEFAULT 0,
-  review_done INTEGER DEFAULT 0,
-  revision_done INTEGER DEFAULT 0
+  date TEXT PRIMARY KEY,
+  questions_solved INTEGER DEFAULT 0,
+  streak_active BOOLEAN DEFAULT 0
 );
